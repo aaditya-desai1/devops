@@ -58,7 +58,7 @@ pipeline {
                 script {
                     sh '''
                     echo "Starting Minikube with Docker Driver and --force..."
-                    minikube start --driver=docker --force
+                    minikube start --driver=none --force
                     '''
                 }
             }
