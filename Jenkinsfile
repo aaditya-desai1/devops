@@ -1,4 +1,6 @@
-node {
+pipeline {
+    agent any  // Use any available Jenkins agent
+
     environment {
         DOCKER_IMAGE = 'node-app'
     }
@@ -6,17 +8,13 @@ node {
     stages {
         stage('Clone Repository') {
             steps {
-                git 'https://github.com/your-username/your-repo.git'
+                git 'https://github.com/aaditya-desai1/devops.git'
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                script {
-                    docker.image('node:latest').inside {
-                        sh 'docker build -t $DOCKER_IMAGE .'
-                    }
-                }
+                sh 'docker build -t $DOCKER_IMAGE .'
             }
         }
 
