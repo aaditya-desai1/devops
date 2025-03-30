@@ -1,4 +1,7 @@
-provider "docker" {}
+provider "docker" {
+version = "~> 2.0"
+source = "kreuzwerker/docker"
+}
 
 resource "docker_image" "node_app" {
   name         = "node-app"
