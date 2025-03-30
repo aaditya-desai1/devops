@@ -55,7 +55,7 @@ pipeline {
                     if ! command -v kubectl &> /dev/null; then
                         curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
                         chmod +x kubectl
-                        mv kubectl /usr/local/bin/
+                        sudo mv kubectl /usr/local/bin/
                     fi
 
                     echo "Installing k3d if not already installed..."
@@ -69,20 +69,21 @@ pipeline {
                         k3d cluster delete jenkins-cluster
                     fi
 
-                    echo "Creating k3d cluster with correct API port..."
+                    echo "Creating k3d cluster..."
                     k3d cluster create jenkins-cluster \
-                        --api-port 127.0.0.1:6550 \
-                        -p "8090:80@loadbalancer" \
+                        --api-port 6550 \
+                        --port "8090:80@loadbalancer" \
                         --agents 1 \
-                        --timeout 5m
+                        --wait
 
-                    echo "Updating kubeconfig to point to correct port..."
-                    KUBECONFIG=~/.kube/config
-                    sed -i 's/0.0.0.0/127.0.0.1/g' $KUBECONFIG
-                    sed -i 's/https:\\/\\/0.0.0.0:6550/https:\\/\\/127.0.0.1:6550/g' $KUBECONFIG
+                    echo "Waiting for cluster to be ready..."
+                    sleep 10
 
-                    echo "Verifying cluster is running..."
+                    echo "Updating kubeconfig and using correct context..."
+                    export KUBECONFIG=$(k3d kubeconfig write jenkins-cluster)
                     kubectl config use-context k3d-jenkins-cluster
+
+                    echo "Checking cluster health..."
                     kubectl cluster-info
                     kubectl get nodes
                     '''
