@@ -1,10 +1,10 @@
 pipeline {
     agent any
-    
+
     environment {
         DOCKER_CREDENTIALS = credentials('dockerhub-credentials')
     }
-    
+
     stages {
         stage('Checkout Code') {
             steps {
@@ -13,7 +13,7 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Build Docker Image') {
             steps {
                 script {
@@ -24,7 +24,7 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Login to Docker Hub') {
             steps {
                 script {
@@ -35,7 +35,7 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Push Docker Image to Docker Hub') {
             steps {
                 script {
@@ -46,7 +46,7 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Setup Kubernetes with k3d') {
             steps {
                 script {
@@ -55,49 +55,51 @@ pipeline {
                     if ! command -v kubectl &> /dev/null; then
                         curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
                         chmod +x kubectl
-                        mv kubectl /usr/local/bin/
+                        sudo mv kubectl /usr/local/bin/
                     fi
-                    
+
                     echo "Installing k3d if not already installed..."
                     if ! command -v k3d &> /dev/null; then
                         curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
                     fi
-                    
+
                     echo "Checking for existing clusters..."
                     if k3d cluster list | grep -q "jenkins-cluster"; then
                         echo "Deleting existing cluster..."
                         k3d cluster delete jenkins-cluster
                     fi
-                    
-                    echo "Creating k3d cluster..."
+
+                    echo "Creating k3d cluster with correct API port..."
                     k3d cluster create jenkins-cluster \
-                        --api-port 6550 \
+                        --api-port 127.0.0.1:6550 \
                         -p "8090:80@loadbalancer" \
                         --agents 1 \
                         --timeout 5m
-                    
+
+                    echo "Updating kubeconfig to point to correct port..."
+                    KUBECONFIG=~/.kube/config
+                    sed -i 's/0.0.0.0/127.0.0.1/g' $KUBECONFIG
+                    sed -i 's/https:\\/\\/0.0.0.0:6550/https:\\/\\/127.0.0.1:6550/g' $KUBECONFIG
+
                     echo "Verifying cluster is running..."
                     kubectl config use-context k3d-jenkins-cluster
                     kubectl cluster-info
                     kubectl get nodes
-                    
-                    echo "Waiting for cluster to be ready..."
-                    sleep 20
                     '''
                 }
             }
         }
-        
+
         stage('Deploy to Kubernetes') {
             steps {
                 script {
                     sh '''
                     echo "Deploying to Kubernetes..."
                     kubectl apply -f deployment.yml
-                    
+
                     echo "Waiting for deployment to be ready..."
                     kubectl rollout status deployment/nodejs-app --timeout=90s
-                    
+
                     echo "Showing running pods..."
                     kubectl get pods
                     '''
@@ -105,7 +107,7 @@ pipeline {
             }
         }
     }
-    
+
     post {
         success {
             echo "✅ Build and Deployment Successful!"
@@ -114,6 +116,7 @@ pipeline {
             echo "❌ Build or Deployment Failed!"
             script {
                 sh '''
+                echo "Cleaning up if cluster exists..."
                 if command -v k3d &> /dev/null; then
                     if k3d cluster list | grep -q "jenkins-cluster"; then
                         k3d cluster delete jenkins-cluster
