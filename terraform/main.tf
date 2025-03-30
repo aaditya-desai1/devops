@@ -1,7 +1,7 @@
 provider "docker" {}
 
 resource "docker_image" "node_app" {
-  name         = "my-node-app"
+  name         = "node-app"
   keep_locally = false
 }
 
