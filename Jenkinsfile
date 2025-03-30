@@ -6,7 +6,6 @@ pipeline {
     }
     
     stages {
-        // ---------------- Stage 1: Checkout Code ----------------
         stage('Checkout Code') {
             steps {
                 script {
@@ -15,7 +14,6 @@ pipeline {
             }
         }
         
-        // ---------------- Stage 2: Build Docker Image ----------------
         stage('Build Docker Image') {
             steps {
                 script {
@@ -27,7 +25,6 @@ pipeline {
             }
         }
         
-        // ---------------- Stage 3: Login to Docker Hub ----------------
         stage('Login to Docker Hub') {
             steps {
                 script {
@@ -39,7 +36,6 @@ pipeline {
             }
         }
         
-        // ---------------- Stage 4: Push Docker Image to Docker Hub ----------------
         stage('Push Docker Image to Docker Hub') {
             steps {
                 script {
@@ -51,8 +47,7 @@ pipeline {
             }
         }
         
-        // ---------------- Stage 5: Install Tools and Setup Kind ----------------
-        stage('Setup Kubernetes Tools') {
+        stage('Setup Kubernetes with k3d') {
             steps {
                 script {
                     sh '''
@@ -61,26 +56,24 @@ pipeline {
                         curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
                         chmod +x kubectl
                         mv kubectl /usr/local/bin/
-                        kubectl version --client
                     fi
                     
-                    echo "Installing Kind if not already installed..."
-                    if ! command -v kind &> /dev/null; then
-                        curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
-                        chmod +x ./kind
-                        mv ./kind /usr/local/bin/
+                    echo "Installing k3d if not already installed..."
+                    if ! command -v k3d &> /dev/null; then
+                        curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
                     fi
                     
-                    echo "Checking if cluster already exists..."
-                    if kind get clusters | grep -q "jenkins-cluster"; then
+                    echo "Checking for existing clusters..."
+                    if k3d cluster list | grep -q "jenkins-cluster"; then
                         echo "Deleting existing cluster..."
-                        kind delete cluster --name jenkins-cluster
+                        k3d cluster delete jenkins-cluster
                     fi
                     
-                    echo "Creating Kind cluster..."
-                    kind create cluster --name jenkins-cluster --wait 3m
+                    echo "Creating k3d cluster..."
+                    k3d cluster create jenkins-cluster --api-port 6550 -p "8080:80@loadbalancer" --agents 1 --timeout 5m
                     
                     echo "Verifying cluster is running..."
+                    kubectl config use-context k3d-jenkins-cluster
                     kubectl cluster-info
                     kubectl get nodes
                     '''
@@ -88,14 +81,10 @@ pipeline {
             }
         }
         
-        // ---------------- Stage 6: Deploy to Kubernetes ----------------
         stage('Deploy to Kubernetes') {
             steps {
                 script {
                     sh '''
-                    echo "Loading Docker image into Kind..."
-                    kind load docker-image aadityadesai/devops:latest --name jenkins-cluster
-                    
                     echo "Deploying to Kubernetes..."
                     kubectl apply -f deployment.yml
                     
@@ -110,28 +99,23 @@ pipeline {
         }
     }
     
-    // ---------------- Post Actions ----------------
     post {
         success {
             echo "✅ Build and Deployment Successful!"
         }
         failure {
             echo "❌ Build or Deployment Failed!"
-            
-            // Clean up on failure
             script {
                 sh '''
-                echo "Cleaning up resources..."
-                if command -v kind &> /dev/null; then
-                    if kind get clusters | grep -q "jenkins-cluster"; then
-                        kind delete cluster --name jenkins-cluster
+                if command -v k3d &> /dev/null; then
+                    if k3d cluster list | grep -q "jenkins-cluster"; then
+                        k3d cluster delete jenkins-cluster
                     fi
                 fi
                 '''
             }
         }
         always {
-            // Clean up Docker images to save space
             sh 'docker system prune -f'
         }
     }
