@@ -1,10 +1,4 @@
-pipeline {
-    agent {
-        docker {
-            image 'node:latest'
-        }
-    }
-
+node {
     environment {
         DOCKER_IMAGE = 'node-app'
     }
@@ -18,13 +12,20 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t $DOCKER_IMAGE .'
+                script {
+                    docker.image('node:latest').inside {
+                        sh 'docker build -t $DOCKER_IMAGE .'
+                    }
+                }
             }
         }
 
         stage('Push to Minikube') {
             steps {
-                sh 'eval $(minikube docker-env) && docker build -t $DOCKER_IMAGE .'
+                sh '''
+                eval $(minikube docker-env)
+                docker build -t $DOCKER_IMAGE .
+                '''
             }
         }
 
