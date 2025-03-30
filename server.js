@@ -4,6 +4,7 @@ const port = 3000;
 
 app.get("/", (req, res) => {
   res.send("Hello, DevOps!");
+  res.send("Hello, Kubernetes!");
 });
 
 app.listen(port, () => {
