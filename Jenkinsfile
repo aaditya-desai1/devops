@@ -6,12 +6,12 @@ pipeline {
     }
 
     stages {
-        
+
         stage('Checkout Code') {
             steps {
                 script {
                     checkout([$class: 'GitSCM',
-                        branches: [[name: '*/main']],  // ✅ Correct branch specified
+                        branches: [[name: '*/main']],
                         userRemoteConfigs: [[url: 'https://github.com/aaditya-desai1/devops.git']]
                     ])
                 }
@@ -23,7 +23,7 @@ pipeline {
                 script {
                     sh '''
                     echo "Building Docker Image..."
-                    docker build -t $DOCKER_IMAGE -f node-app .
+                    docker build -t $DOCKER_IMAGE -f Dockerfile .
                     '''
                 }
             }
