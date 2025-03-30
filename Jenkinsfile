@@ -2,50 +2,81 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_IMAGE = 'node-app'       // Docker Image Name
-        DOCKER_TAG = 'latest'           // Docker Tag
+        DOCKER_IMAGE = 'aadityadesai/devops:latest'
     }
 
     stages {
-
-        // ---------------- Stage 1: Clone Repository ----------------
-        stage('Clone Repository') {
+        
+        stage('Checkout Code') {
             steps {
-                git branch: 'main', url: 'https://github.com/aaditya-desai1/devops.git'
+                git 'https://github.com/aaditya-desai1/devops.git'
             }
         }
 
-        // ---------------- Stage 2: Build Docker Image ----------------
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t $DOCKER_IMAGE:$DOCKER_TAG .'
-            }
-        }
-
-        // ---------------- Stage 3: Push to Minikube ----------------
-        stage('Push to Minikube') {
-            steps {
                 script {
-                    // Set Minikube environment variables
-                    sh 'eval $(minikube docker-env)'
-                    sh 'docker tag $DOCKER_IMAGE:$DOCKER_TAG $(minikube ip):5000/$DOCKER_IMAGE:$DOCKER_TAG'
-                    sh 'docker push $(minikube ip):5000/$DOCKER_IMAGE:$DOCKER_TAG'
+                    sh '''
+                    echo "Building Docker Image..."
+                    docker build -t $DOCKER_IMAGE -f node-app .
+                    '''
                 }
             }
         }
 
-        // ---------------- Stage 4: Deploy to Kubernetes ----------------
+        stage('Login to Docker Hub') {
+            steps {
+                script {
+                    withCredentials([string(credentialsId: 'dockerhub-credentials', variable: 'DOCKER_HUB_PASS')]) {
+                        sh '''
+                        echo "$DOCKER_HUB_PASS" | docker login -u "aadityadesai" --password-stdin
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Push Docker Image to Docker Hub') {
+            steps {
+                script {
+                    sh '''
+                    echo "Pushing Docker Image to Docker Hub..."
+                    docker push $DOCKER_IMAGE
+                    '''
+                }
+            }
+        }
+
+        stage('Start Minikube') {
+            steps {
+                script {
+                    sh '''
+                    echo "Starting Minikube..."
+                    minikube start --driver=docker
+                    '''
+                }
+            }
+        }
+
         stage('Deploy to Kubernetes') {
             steps {
-                sh 'kubectl apply -f k8s/deployment.yml'
+                script {
+                    sh '''
+                    echo "Deploying to Kubernetes..."
+                    kubectl apply -f k8s/deployment.yml
+                    kubectl apply -f k8s/service.yml
+                    '''
+                }
             }
         }
     }
 
-    // ---------------- Post-Build: Clean up ----------------
     post {
-        always {
-            sh 'docker system prune -f'
+        success {
+            echo '✅ Build and Deployment Successful!'
+        }
+        failure {
+            echo '❌ Build or Deployment Failed!'
         }
     }
 }
