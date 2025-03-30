@@ -13,9 +13,9 @@
         state: present
 
     - name: Start Node.js container
-      docker_container:
+      community.docker.docker_container:
         name: node-container
-        image: my-node-app
+        image: node-app
         state: started
         ports:
           - "3000:3000"
