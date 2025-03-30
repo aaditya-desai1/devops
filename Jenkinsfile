@@ -51,11 +51,19 @@ pipeline {
             }
         }
         
-        // ---------------- Stage 5: Install and Setup Kind ----------------
-        stage('Setup Kind Cluster') {
+        // ---------------- Stage 5: Install Tools and Setup Kind ----------------
+        stage('Setup Kubernetes Tools') {
             steps {
                 script {
                     sh '''
+                    echo "Installing kubectl if not already installed..."
+                    if ! command -v kubectl &> /dev/null; then
+                        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+                        chmod +x kubectl
+                        mv kubectl /usr/local/bin/
+                        kubectl version --client
+                    fi
+                    
                     echo "Installing Kind if not already installed..."
                     if ! command -v kind &> /dev/null; then
                         curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
@@ -70,7 +78,7 @@ pipeline {
                     fi
                     
                     echo "Creating Kind cluster..."
-                    kind create cluster --name jenkins-cluster --wait 5m
+                    kind create cluster --name jenkins-cluster --wait 3m
                     
                     echo "Verifying cluster is running..."
                     kubectl cluster-info
@@ -92,7 +100,7 @@ pipeline {
                     kubectl apply -f deployment.yml
                     
                     echo "Waiting for deployment to be ready..."
-                    kubectl rollout status deployment/nodejs-app
+                    kubectl rollout status deployment/nodejs-app --timeout=90s
                     
                     echo "Showing running pods..."
                     kubectl get pods
