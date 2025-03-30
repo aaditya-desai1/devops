@@ -9,7 +9,12 @@ pipeline {
         
         stage('Checkout Code') {
             steps {
-                git 'https://github.com/aaditya-desai1/devops.git'
+                script {
+                    checkout([$class: 'GitSCM',
+                        branches: [[name: '*/main']],  // ✅ Correct branch specified
+                        userRemoteConfigs: [[url: 'https://github.com/aaditya-desai1/devops.git']]
+                    ])
+                }
             }
         }
 
