@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: node-app
-          image: node-app
+          image: aadityadesai/devops:latest
           ports:
             - containerPort: 3000
 ---
