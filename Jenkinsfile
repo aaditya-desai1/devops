@@ -70,12 +70,19 @@ pipeline {
                     fi
                     
                     echo "Creating k3d cluster..."
-                    k3d cluster create jenkins-cluster --api-port 6550 -p 8090:80@loadbalancer --agents 1 --timeout 5m
+                    k3d cluster create jenkins-cluster \
+                        --api-port 6550 \
+                        -p "8090:80@loadbalancer" \
+                        --agents 1 \
+                        --timeout 5m
                     
                     echo "Verifying cluster is running..."
                     kubectl config use-context k3d-jenkins-cluster
                     kubectl cluster-info
                     kubectl get nodes
+                    
+                    echo "Waiting for cluster to be ready..."
+                    sleep 20
                     '''
                 }
             }
